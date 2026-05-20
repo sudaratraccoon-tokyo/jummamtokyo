@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ระบบเช็คสต็อกจั้มม่ำขนมโตเกียว</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+body{font-family:'Sarabun',sans-serif;background:#fff7ed}
+.card{transition:.2s}
+.card:hover{transform:translateY(-2px)}
+</style>
+</head>
+<body class="p-4">
+<div class="max-w-6xl mx-auto">
+
+<div class="text-center mb-8">
+<h1 class="text-4xl font-bold text-orange-600">🧇 จั้มม่ำขนมโตเกียว</h1>
+<p class="text-gray-600 mt-2">ระบบเช็คสต็อกวัตถุดิบ</p>
+</div>
+
+<div class="grid md:grid-cols-3 gap-4 mb-8" id="category-grid"></div>
+
+<div class="bg-white rounded-2xl shadow p-5">
+<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-5">
+<h2 id="current-category" class="text-2xl font-bold text-gray-800">เลือกหมวดหมู่</h2>
+<input id="checker-name" type="text" placeholder="ชื่อผู้เช็คสต็อก" class="border rounded-xl px-4 py-2">
+</div>
+
+<div class="overflow-auto">
+<table class="w-full border-collapse">
+<thead>
+<tr class="bg-orange-100">
+<th class="p-3 text-left">รายการ</th>
+<th class="p-3">จำนวน</th>
+<th class="p-3">หน่วย</th>
+<th class="p-3">หมายเหตุ</th>
+</tr>
+</thead>
+<tbody id="stock-body"></tbody>
+</table>
+</div>
+
+<div class="mt-6 flex gap-3">
+<button onclick="saveData()" class="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-xl font-semibold">บันทึกข้อมูล</button>
+<button onclick="showHistory()" class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-semibold">ดูประวัติ</button>
+</div>
+</div>
+
+<div id="history-section" class="hidden mt-8 bg-white rounded-2xl shadow p-5">
+<h2 class="text-2xl font-bold mb-4">📋 ประวัติการเช็คสต็อก</h2>
+<div id="history-list"></div>
+</div>
+
+</div>
+
+<script>
+const DRAFT_KEY = "tokyo_stock_draft_v1";
+
+const stockItems = {
+  "วัตถุดิบแป้งครีม": [
+    { name: "แป้งทอดกรอบ UFM", unit: "กรัม/กิโลกรัม" },
+    { name: "แป้งสาลีตราเชอรี่", unit: "กรัม/กิโลกรัม" },
+    { name: "แป้งข้าวเจ้า", unit: "กรัม/กิโลกรัม" },
+    { name: "แป้งข้าวโพด", unit: "กรัม/กิโลกรัม" },
+    { name: "น้ำตาลทรายมิตรผล", unit: "กรัม/กิโลกรัม" },
+    { name: "สีผสมเหลืองไข่", unit: "มิลลิลิตร" },
+    { name: "กลิ่นวนิลา", unit: "มิลลิลิตร" },
+    { name: "แป้งหอม", unit: "กรัม/กิโลกรัม" },
+    { name: "ผงฟู", unit: "กรัม/กิโลกรัม" },
+    { name: "เบคกิ้งโซดา", unit: "กรัม/กิโลกรัม" },
+    { name: "นมสด", unit: "ลิตร" },
+    { name: "ไข่ไก่", unit: "ฟอง" },
+    { name: "สีผสมสีเขียว", unit: "มิลลิลิตร" },
+    { name: "กลิ่นใบเตย", unit: "มิลลิลิตร" },
+    { name: "เกลือ", unit: "กรัม/กิโลกรัม" },
+    { name: "กะทิ", unit: "มิลลิลิตร" }
+  ],
+
+  "วัตถุดิบคาว": [
+    { name: "ไส้กรอกแดง", unit: "ชิ้น" },
+    { name: "ไส้กรอกหนังกรอบ", unit: "ชิ้น" },
+    { name: "แฮม", unit: "ชิ้น" },
+    { name: "ไก่สับ", unit: "ชิ้น" },
+    { name: "ปูอัด", unit: "ชิ้น" },
+    { name: "ไข่นก", unit: "ชิ้น" },
+    { name: "ชีส", unit: "ชิ้น" },
+    { name: "พริกเผา", unit: "กรัม" },
+    { name: "ไก่หยอง", unit: "กรัม" },
+    { name: "พิซซ่า", unit: "กรัม" }
+  ],
+
+  "วัตถุดิบหวาน": [
+    { name: "ครีม", unit: "กรัม" },
+    { name: "ใบเตย", unit: "กรัม" },
+    { name: "แยมสตอเบอร์รี่", unit: "กรัม" },
+    { name: "มะพร้าวอ่อน", unit: "ถุง" },
+    { name: "ฝอยทอง", unit: "กรัม" },
+    { name: "เยลลี่แดง", unit: "กรัม" },
+    { name: "โอริโอ้", unit: "ห่อ" },
+    { name: "คุกกี้โอวัลติน", unit: "ห่อ" },
+    { name: "นูเทลล่า", unit: "กรัม" },
+    { name: "อัลมอนต์", unit: "กรัม" },
+    { name: "ผงโอวัลติน", unit: "กรัม" },
+    { name: "กล้วยหอม", unit: "ลูก" },
+    { name: "วิปครีม", unit: "กรัม" }
+  ],
+
+  "ซอส": [
+    { name: "มะเขือเทศ", unit: "กรัม" },
+    { name: "พริก", unit: "กรัม" },
+    { name: "มายองเนส", unit: "กรัม" },
+    { name: "พริกไทย", unit: "กรัม" },
+    { name: "แม็กกี้", unit: "กรัม" },
+    { name: "ช็อค(แพนเค้ก)", unit: "กรัม" },
+    { name: "สตอ(แพนเค้ก)", unit: "กรัม" },
+    { name: "น้ำผึ้ง(แพนเค้ก)", unit: "กรัม" },
+    { name: "ช็อค(โดรายากิ)", unit: "กรัม" },
+    { name: "สตอ(โดรายากิ)", unit: "กรัม" },
+    { name: "นมข้น", unit: "กรัม" },
+    { name: "คาราเมล", unit: "กรัม" },
+    { name: "เนย", unit: "กรัม" }
+  ],
+
+  "บรรจุภัณฑ์": [
+    { name: "ซองขนมโตเกียว", unit: "ซอง" },
+    { name: "กล่อง 104", unit: "ใบ" },
+    { name: "ถาด 4×6", unit: "ใบ" },
+    { name: "ถาด 4×7.5", unit: "ใบ" },
+    { name: "ถาด 4×4", unit: "ใบ" },
+    { name: "แผ่นรอง 15×15", unit: "แผ่น" },
+    { name: "แผ่นรอง 12×12", unit: "แผ่น" },
+    { name: "ส้อมจิ๋ว", unit: "คัน" },
+    { name: "แก้ว 12OZ.", unit: "ใบ" },
+    { name: "ฝาโดม 🚫95", unit: "ใบ" },
+    { name: "ฝาตัด 🚫95", unit: "ใบ" },
+    { name: "ช้อนดำ", unit: "คัน" },
+    { name: "ถุง 8×16", unit: "กิโลกรัม" },
+    { name: "ถุง 6×14", unit: "กิโลกรัม" },
+    { name: "ถุง 6×11", unit: "กิโลกรัม" },
+    { name: "ถ้วย 1 OZ.", unit: "ใบ" },
+    { name: "ซิป 6×8", unit: "ซอง" },
+    { name: "ซิป 8×12", unit: "ซอง" },
+    { name: "แก้ว 4 OZ.", unit: "ใบ" },
+    { name: "ฝา 🚫75", unit: "ใบ" },
+    { name: "หนังสือพิมพ์", unit: "แผ่น" },
+    { name: "หลอดสั้น", unit: "อัน" },
+    { name: "ช้อนขาว", unit: "คัน" }
+  ],
+
+  "ของสิ้นเปลือง": [
+    { name: "แก๊สกระป๋อง", unit: "ป๋อง" },
+    { name: "แก๊สถัง", unit: "ถัง" },
+    { name: "น้ำแข็ง", unit: "กระสอบ" }
+  ]
+};
+
+const UNIT_OPTIONS_BY_ITEM = {
+  "แป้งทอดกรอบ UFM": ["กรัม","กิโลกรัม"],
+  "แป้งสาลีตราเชอรี่": ["กรัม","กิโลกรัม"],
+  "แป้งข้าวเจ้า": ["กรัม","กิโลกรัม"],
+  "แป้งข้าวโพด": ["กรัม","กิโลกรัม"],
+  "น้ำตาลทรายมิตรผล": ["กรัม","กิโลกรัม"],
+  "แป้งหอม": ["กรัม","กิโลกรัม"],
+  "ผงฟู": ["กรัม","กิโลกรัม"],
+  "เบคกิ้งโซดา": ["กรัม","กิโลกรัม"],
+  "เกลือ": ["กรัม","กิโลกรัม"]
+};
+
+let currentCategory = "วัตถุดิบแป้งครีม";
+
+function getCategoryStyle(category) {
+  return {
+    "วัตถุดิบแป้งครีม": {
+      color: "bg-yellow-500",
+      icon: "🧈"
+    },
+    "วัตถุดิบคาว": {
+      color: "bg-red-500",
+      icon: "🌭"
+    },
+    "วัตถุดิบหวาน": {
+      color: "bg-pink-500",
+      icon: "🍫"
+    },
+    "ซอส": {
+      color: "bg-orange-500",
+      icon: "🥫"
+    },
+    "บรรจุภัณฑ์": {
+      color: "bg-cyan-500",
+      icon: "📦"
+    },
+    "ของสิ้นเปลือง": {
+      color: "bg-gray-500",
+      icon: "🔥"
+    }
+  }[category];
+}
+
+function normalizeQtyToBase_(qty, unitSelected, unitOptions) {
+  const n = Number(qty);
+
+  if (!isFinite(n)) {
+    return {
+      qty: NaN,
+      unit: String(unitSelected || "").trim()
+    };
+  }
+
+  const u = String(unitSelected || "").trim();
+  const opts = (unitOptions || []).map(v => String(v || "").trim());
+
+  if (opts.includes("กรัม") && opts.includes("กิโลกรัม")) {
+    return {
+      qty: u === "กรัม" ? n / 1000 : n,
+      unit: "กิโลกรัม"
+    };
+  }
+
+  return {
+    qty: n,
+    unit: u
+  };
+}
+
+function buildCategories(){
+  const grid=document.getElementById('category-grid');
+  grid.innerHTML='';
+
+  Object.keys(stockItems).forEach(cat=>{
+    const style=getCategoryStyle(cat);
+
+    grid.innerHTML+=`
+    <button onclick="selectCategory('${cat}')" class="card ${style.color} text-white rounded-2xl p-5 text-left shadow-lg">
+      <div class="text-4xl mb-2">${style.icon}</div>
+      <div class="font-bold text-lg">${cat}</div>
+      <div class="text-sm opacity-90">${stockItems[cat].length} รายการ</div>
+    </button>`;
+  });
+}
+
+function selectCategory(cat){
+  currentCategory=cat;
+  document.getElementById('current-category').innerText=cat;
+  renderTable();
+}
+
+function renderTable(){
+  const body=document.getElementById('stock-body');
+  body.innerHTML='';
+
+  stockItems[currentCategory].forEach(item=>{
+    const options=UNIT_OPTIONS_BY_ITEM[item.name]||[item.unit];
+
+    body.innerHTML+=`
+    <tr class="border-b">
+      <td class="p-3">${item.name}</td>
+      <td class="p-3">
+        <input type="number" step="0.001" class="qty border rounded-lg px-3 py-2 w-full" data-name="${item.name}">
+      </td>
+      <td class="p-3">
+        <select class="unit border rounded-lg px-2 py-2" data-name="${item.name}">
+          ${options.map(u=>`<option>${u}</option>`).join('')}
+        </select>
+      </td>
+      <td class="p-3">
+        <input type="text" class="note border rounded-lg px-3 py-2 w-full" data-name="${item.name}">
+      </td>
+    </tr>`;
+  });
+}
+
+function saveData(){
+  const checker=document.getElementById('checker-name').value;
+
+  const data=[];
+
+  document.querySelectorAll('.qty').forEach(q=>{
+    const name=q.dataset.name;
+    const unit=document.querySelector(`.unit[data-name="${name}"]`).value;
+    const note=document.querySelector(`.note[data-name="${name}"]`).value;
+
+    const options=UNIT_OPTIONS_BY_ITEM[name]||[unit];
+    const normalized=normalizeQtyToBase_(q.value,unit,options);
+
+    data.push({
+      name,
+      quantity:normalized.qty,
+      unit:normalized.unit,
+      note
+    });
+  });
+
+  const history=JSON.parse(localStorage.getItem('tokyo_history')||'[]');
+
+  history.unshift({
+    date:new Date().toLocaleString('th-TH'),
+    category:currentCategory,
+    checker,
+    items:data
+  });
+
+  localStorage.setItem('tokyo_history',JSON.stringify(history));
+
+  alert('บันทึกข้อมูลสำเร็จ');
+}
+
+function showHistory(){
+  const section=document.getElementById('history-section');
+  section.classList.remove('hidden');
+
+  const list=document.getElementById('history-list');
+  const history=JSON.parse(localStorage.getItem('tokyo_history')||'[]');
+
+  list.innerHTML='';
+
+  history.forEach(h=>{
+    list.innerHTML+=`
+    <div class="border rounded-xl p-4 mb-4">
+      <div class="font-bold text-lg">${h.category}</div>
+      <div class="text-sm text-gray-500">${h.date} | ${h.checker||'-'}</div>
+      <div class="mt-3 space-y-1">
+        ${h.items.map(i=>`
+          <div class="flex justify-between text-sm">
+            <span>${i.name}</span>
+            <span>${i.quantity} ${i.unit}</span>
+          </div>`).join('')}
+      </div>
+    </div>`;
+  });
+}
+
+buildCategories();
+renderTable();
+</script>
+</body>
+</html>
